@@ -1,0 +1,1139 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sosy'Valet Jumeau numérique</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout : console de supervision — commandes à gauche, parking 3D au centre, indicateurs à droite */
+:root{
+  --bg:#E9EDF0; --panel:#FFFFFF; --panel-2:#F3F6F8; --line:#D3DADF; --fg:#18222B; --muted:#5A6873;
+  --accent:#0D7480; --accent-fg:#FFFFFF; --accent-soft:#D7ECEE;
+  --ok:#2F8F57; --warn:#C27A12; --alert:#C2392E; --charge:#2F6CC9; --idle:#7C8790;
+  --scene-bg:#CDD5DA; --chart-grid:#E1E6EA;
+  --f-display:"Barlow Semi Condensed","Arial Narrow",Arial,sans-serif;
+  --f-body:"IBM Plex Sans","Segoe UI",Roboto,Arial,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0F1418; --panel:#161D23; --panel-2:#1C242B; --line:#2A353E; --fg:#E2E8ED; --muted:#93A2AE;
+  --accent:#3FB0BB; --accent-fg:#06262A; --accent-soft:#163A3F;
+  --ok:#4CBB7A; --warn:#E3A03C; --alert:#EA6458; --charge:#5B93EA; --idle:#8995A0;
+  --scene-bg:#0B1014; --chart-grid:#25303A; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0F1418; --panel:#161D23; --panel-2:#1C242B; --line:#2A353E; --fg:#E2E8ED; --muted:#93A2AE;
+  --accent:#3FB0BB; --accent-fg:#06262A; --accent-soft:#163A3F;
+  --ok:#4CBB7A; --warn:#E3A03C; --alert:#EA6458; --charge:#5B93EA; --idle:#8995A0;
+  --scene-bg:#0B1014; --chart-grid:#25303A; color-scheme:dark}
+html,body{height:100%}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:13px;line-height:1.45}
+*{box-sizing:border-box}
+button,input,select{font:inherit;color:inherit}
+.app{display:grid;grid-template-columns:288px minmax(0,1fr) 336px;grid-template-rows:auto minmax(0,1fr) auto;
+  grid-template-areas:"top top top" "left stage right" "foot foot foot";height:100%;gap:10px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:10px}
+.top{grid-area:top;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.brand{display:flex;align-items:baseline;gap:10px;margin-right:auto}
+.brand h1{font-family:var(--f-display);font-weight:700;font-size:24px;letter-spacing:.01em;margin:0;text-wrap:balance}
+.brand span{color:var(--muted);font-size:12px}
+.clock{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:15px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:4px 10px}
+.clock small{color:var(--muted);font-size:11px;margin-left:6px}
+.transport{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:6px 11px;cursor:pointer;font-weight:500;line-height:1.2}
+.btn:hover{border-color:var(--accent)}
+.btn:focus-visible,.chip:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn.primary{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.btn.danger{color:var(--alert);border-color:color-mix(in srgb,var(--alert) 45%,var(--line))}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.speed{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12px}
+.speed input{width:110px;accent-color:var(--accent)}
+.speed output{font-family:var(--f-mono);color:var(--fg);min-width:34px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;min-width:0}
+.left,.right{grid-area:left;overflow:auto;display:flex;flex-direction:column;gap:10px;min-height:0}
+.right{grid-area:right}
+.sec{padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.sec h2{font-family:var(--f-display);font-weight:600;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0}
+.scen{display:grid;grid-template-columns:1fr;gap:5px}
+.chip{display:flex;gap:8px;align-items:flex-start;text-align:left;border:1px solid var(--line);background:var(--panel-2);border-radius:6px;padding:6px 8px;cursor:pointer}
+.chip b{font-family:var(--f-mono);font-weight:500;color:var(--accent);min-width:20px}
+.chip span{display:block}
+.chip em{display:block;font-style:normal;color:var(--muted);font-size:11.5px}
+.chip:hover,.chip.on{border-color:var(--accent);background:var(--accent-soft)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.form{display:grid;grid-template-columns:1fr 1fr;gap:6px 8px}
+.form label{display:flex;flex-direction:column;gap:2px;font-size:11.5px;color:var(--muted)}
+.form label.full{grid-column:1/-1}
+.form input,.form select{border:1px solid var(--line);background:var(--panel-2);border-radius:5px;padding:4px 6px;width:100%;min-width:0}
+.form .check{flex-direction:row;align-items:center;gap:6px;color:var(--fg)}
+.form .check input{width:auto}
+details.sec summary{cursor:pointer;font-family:var(--f-display);font-weight:600;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.hyp{width:100%;border-collapse:collapse;font-size:11.5px}
+.hyp td{padding:3px 2px;border-bottom:1px solid var(--line);vertical-align:middle}
+.hyp td:last-child{text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.hyp input{width:64px;border:1px solid var(--line);background:var(--panel-2);border-radius:4px;padding:2px 4px;text-align:right}
+.tag{font-size:10px;padding:1px 5px;border-radius:9px;margin-left:4px;white-space:nowrap}
+.tag.dos{background:var(--accent-soft);color:var(--accent)}
+.tag.hyp{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
+.stage{grid-area:stage;position:relative;overflow:hidden;min-height:320px;background:var(--scene-bg)}
+#view{position:absolute;inset:0;display:block;width:100%;height:100%;touch-action:none}
+.ov{position:absolute;background:color-mix(in srgb,var(--panel) 92%,transparent);border:1px solid var(--line);border-radius:8px;padding:8px 10px;backdrop-filter:blur(4px)}
+.banner{left:10px;top:10px;max-width:min(430px,calc(100% - 20px))}
+.banner b{font-family:var(--f-display);font-size:15px;font-weight:700}
+.banner p{margin:2px 0 0;color:var(--muted);font-size:12px}
+.banner .step{margin-top:4px;font-family:var(--f-mono);font-size:11.5px;color:var(--accent)}
+.legend{left:10px;bottom:10px;display:flex;flex-wrap:wrap;gap:4px 12px;font-size:11.5px;max-width:calc(100% - 20px)}
+.legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.views{right:10px;bottom:10px;display:flex;gap:4px;padding:4px}
+.views .btn{padding:4px 8px;font-size:12px}
+.info{right:10px;top:10px;width:min(270px,calc(100% - 20px));display:flex;flex-direction:column;gap:6px}
+.info h3{margin:0;font-family:var(--f-display);font-size:16px;display:flex;justify-content:space-between;align-items:center;gap:6px}
+.info dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:12px}
+.info dt{color:var(--muted)}
+.info dd{margin:0;font-family:var(--f-mono);font-variant-numeric:tabular-nums;text-align:right}
+.info .acts{display:flex;flex-wrap:wrap;gap:5px}
+.info .acts .btn{padding:4px 8px;font-size:12px}
+.x{border:0;background:none;cursor:pointer;color:var(--muted);font-size:16px;line-height:1}
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.kpi{background:var(--panel-2);border-radius:6px;padding:6px 8px;display:flex;flex-direction:column;gap:1px;border-left:3px solid var(--line)}
+.kpi span{color:var(--muted);font-size:11px}
+.kpi b{font-family:var(--f-mono);font-weight:500;font-size:17px;font-variant-numeric:tabular-nums}
+.kpi b small{font-size:11px;color:var(--muted);font-weight:400}
+.kpi.ok{border-left-color:var(--ok)} .kpi.warn{border-left-color:var(--warn)} .kpi.alert{border-left-color:var(--alert)} .kpi.charge{border-left-color:var(--charge)}
+.chart{display:flex;flex-direction:column;gap:2px}
+.chart .hd{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted)}
+.chart .hd b{font-family:var(--f-mono);color:var(--fg);font-weight:500}
+.chart canvas{width:100%;height:64px;display:block}
+.list{display:flex;flex-direction:column;gap:4px;font-size:12px}
+.row{display:flex;align-items:center;gap:8px;background:var(--panel-2);border-radius:5px;padding:4px 7px}
+.row .id{font-family:var(--f-mono);font-weight:500;min-width:26px}
+.row .st{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}
+.pill{font-size:10.5px;padding:1px 7px;border-radius:9px;white-space:nowrap;background:color-mix(in srgb,currentColor 14%,transparent)}
+.pill.ok{color:var(--ok)} .pill.warn{color:var(--warn)} .pill.alert{color:var(--alert)} .pill.charge{color:var(--charge)} .pill.idle{color:var(--idle)}
+.bar{height:5px;background:var(--line);border-radius:3px;overflow:hidden;width:70px}
+.bar i{display:block;height:100%;background:var(--charge)}
+.log{max-height:240px;overflow:auto;display:flex;flex-direction:column;gap:3px;font-size:12px}
+.log div{display:grid;grid-template-columns:58px 1fr;gap:6px;padding:2px 0;border-bottom:1px dashed var(--line)}
+.log time{font-family:var(--f-mono);color:var(--muted);font-size:11px}
+.log .ok{color:var(--ok)} .log .warn{color:var(--warn)} .log .alert{color:var(--alert)} .log .charge{color:var(--charge)}
+.empty{color:var(--muted);font-size:12px}
+.foot{grid-area:foot;color:var(--muted);font-size:11.5px;text-wrap:balance}
+@media (max-width:1180px){
+  html,body{height:auto}
+  .app{grid-template-columns:270px minmax(0,1fr);grid-template-rows:auto auto auto auto;grid-template-areas:"top top" "left stage" "right right" "foot foot";height:auto}
+  .stage{height:72vh}
+  .left{max-height:72vh}
+  .right{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));align-items:start}
+}
+@media (max-width:760px){
+  .app{grid-template-columns:minmax(0,1fr);grid-template-areas:"top" "stage" "left" "right" "foot"}
+  .stage{height:62vh}
+  .left{max-height:none}
+  .info{top:auto;bottom:100px}
+  .legend{bottom:52px;right:10px}
+}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+</style>
+<style>body{margin:0}img{max-width:100%}</style>
+</head>
+<body>
+
+
+<div class="app">
+  <header class="top">
+    <div class="brand"><h1>Sosy'Valet</h1><span>Jumeau numérique · parking mixte avec voiturier automatique et recharge partagée</span></div>
+    <div class="clock" id="clock">08:00:00<small>heure simulée</small></div>
+    <div class="transport">
+      <button class="btn primary" id="bPlay" type="button">Mettre en pause</button>
+      <button class="btn" id="bReset" type="button">Réinitialiser</button>
+      <label class="speed" for="speed">Vitesse <input id="speed" type="range" min="0.5" max="10" step="0.5" value="1"><output id="speedOut">×1</output></label>
+    </div>
+  </header>
+
+  <aside class="left">
+    <section class="panel sec">
+      <h2>Scénarios</h2>
+      <div class="scen" id="scenarios"></div>
+    </section>
+    <section class="panel sec">
+      <h2>Commandes</h2>
+      <div class="grid2">
+        <button class="btn" id="bValet" type="button">Demander un voiturier</button>
+        <button class="btn" id="bRestit" type="button">Demander la restitution</button>
+        <button class="btn" id="bCharge" type="button">Simuler une recharge</button>
+        <button class="btn danger" id="bObst" type="button">Simuler un obstacle</button>
+      </div>
+    </section>
+    <section class="panel sec">
+      <h2>Ajouter un véhicule</h2>
+      <form class="form" id="carForm">
+        <label for="fMode">Mode<select id="fMode"><option value="valet">Voiturier</option><option value="self">Stationnement libre</option></select></label>
+        <label for="fEnergy">Motorisation<select id="fEnergy"><option value="ice">Thermique</option><option value="ev">Électrique</option></select></label>
+        <label for="fMass">Masse (kg)<input id="fMass" type="number" min="600" max="4000" step="50" value="1550"></label>
+        <label for="fLen">Longueur × largeur (m)<span style="display:flex;gap:4px"><input id="fLen" type="number" min="3" max="6.5" step="0.1" value="4.3" aria-label="Longueur en mètres"><input id="fWid" type="number" min="1.5" max="2.5" step="0.05" value="1.8" aria-label="Largeur en mètres"></span></label>
+        <label for="fSoc">Batterie initiale (%)<input id="fSoc" type="number" min="1" max="99" value="25"></label>
+        <label for="fTarget">Charge souhaitée (%)<input id="fTarget" type="number" min="10" max="100" value="80"></label>
+        <label for="fDep" class="full">Heure de départ prévue<input id="fDep" type="time" value="11:00"></label>
+        <label class="check full" for="fPass"><input id="fPass" type="checkbox"> Un passager reste à bord au moment de la dépose</label>
+        <button class="btn primary full" style="grid-column:1/-1" type="submit">Ajouter le véhicule</button>
+      </form>
+    </section>
+    <details class="panel sec" id="hypBox">
+      <summary>Paramètres et hypothèses</summary>
+      <table class="hyp" id="hypTable"></table>
+      <button class="btn" id="bApply" type="button">Appliquer et réinitialiser</button>
+      <p class="empty">Les valeurs « dossier » viennent de l'AFT de Sosy'Valet. Les valeurs « hypothèse » sont des choix de démonstration, modifiables, et ne décrivent pas un parking réel.</p>
+    </details>
+  </aside>
+
+  <main class="stage" id="stage">
+    <canvas id="view" aria-label="Vue 3D du parking Sosy'Valet"></canvas>
+    <div class="ov banner" id="banner"><b id="bnTitle">État de démonstration</b><p id="bnText">Parking en exploitation : stationnements libres, véhicules confiés au voiturier et recharge partagée en cours. Choisissez un scénario ou cliquez sur une place, un véhicule ou un robot.</p><div class="step" id="bnStep"></div></div>
+    <div class="ov info" id="info" hidden></div>
+    <div class="ov legend" aria-label="Légende des couleurs des places">
+      <span><i style="background:#3FAE6B"></i>Libre</span><span><i style="background:#D2483E"></i>Occupée</span><span><i style="background:#3B7BE0"></i>En recharge</span><span><i style="background:#E8962E"></i>Réservée / opération</span><span><i style="background:#8C949B"></i>Indisponible</span>
+    </div>
+    <div class="ov views"><button class="btn" id="vPersp" type="button">Perspective</button><button class="btn" id="vTop" type="button">Dessus</button><button class="btn" id="vFollow" type="button">Suivre R1</button></div>
+  </main>
+
+  <aside class="right">
+    <section class="panel sec">
+      <h2>Supervision</h2>
+      <div class="kpis" id="kpis"></div>
+    </section>
+    <section class="panel sec">
+      <div class="chart"><div class="hd"><span>Taux d'occupation</span><b id="cOccV">0 %</b></div><canvas id="cOcc" height="64"></canvas></div>
+      <div class="chart"><div class="hd"><span>Puissance consommée / disponible</span><b id="cPowV">0 kW</b></div><canvas id="cPow" height="64"></canvas></div>
+    </section>
+    <section class="panel sec">
+      <h2>Robots voituriers</h2>
+      <div class="list" id="robots"></div>
+    </section>
+    <section class="panel sec">
+      <h2>Recharge partagée</h2>
+      <div class="list" id="evs"></div>
+    </section>
+    <section class="panel sec">
+      <h2>Événements</h2>
+      <div class="log" id="log" aria-live="polite"></div>
+    </section>
+  </aside>
+
+  <footer class="foot">Prototype de jumeau numérique alimenté par des données simulées, réalisé pour le projet Sosy'Valet (M1 Ingénierie des systèmes complexes). Il illustre le fonctionnement du concept et ne valide pas physiquement la sécurité du dispositif.</footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function(){
+'use strict';
+const $ = s => document.querySelector(s);
+
+/* ================================================================ PARAMÈTRES */
+// src : 'dos' = valeur issue de l'AFT du dossier ; 'hyp' = hypothèse de démonstration modifiable
+const PARAMS = [
+  ['nPlaces','Nombre de places',20,'hyp',8,40,1],
+  ['nBornes','Places avec borne (Type 2)',4,'hyp',1,8,1],
+  ['nRobots','Robots voituriers',2,'hyp',1,3,1],
+  ['pAvail','Puissance disponible (kW)',22,'hyp',4,200,1],
+  ['pBorne','Puissance par borne (kW)',7.4,'hyp',3.7,22,0.1],
+  ['battery','Capacité batterie VE (kWh)',60,'hyp',20,120,1],
+  ['chargeAccel','Accélération de la recharge (×)',240,'hyp',1,1200,1],
+  ['vEmpty','Vitesse robot à vide (km/h)',8,'hyp',2,10,0.5],
+  ['vCar','Vitesse conducteur (km/h)',10,'hyp',3,15,0.5],
+  ['placeW','Largeur de place (m)',2.5,'hyp',2.3,3,0.05],
+  ['placeL','Longueur de place (m)',5,'hyp',4.5,6,0.1],
+  ['vLoaded','Vitesse max robot chargé (km/h)',6,'dos',1,10,0.5],
+  ['detect','Distance de détection (m)',3,'dos',1,8,0.1],
+  ['reaction','Temps de réaction (s)',0.3,'dos',0.05,2,0.05],
+  ['stopMax','Distance d\'arrêt max (m)',1,'dos',0.3,3,0.1],
+  ['massMax','Masse max acceptée (kg)',2500,'dos',1000,4000,50],
+  ['lMax','Longueur max (m)',5,'dos',3,7,0.1],
+  ['wMax','Largeur max (m)',2,'dos',1.5,2.6,0.05],
+  ['restitObj','Objectif de restitution (s)',180,'dos',30,600,10],
+  ['socStep','Mise à jour du niveau de charge (s)',300,'dos',60,900,30],
+];
+const H = {}; PARAMS.forEach(p => H[p[0]] = p[2]);
+
+/* ================================================================ COULEURS 3D */
+const C = { free:0x3FAE6B, occ:0xD2483E, charge:0x3B7BE0, res:0xE8962E, off:0x8C949B,
+  asphalt:0x4A5157, lane:0x5A6167, line:0xE9ECEE, walk:0xC9B458, concrete:0x9AA1A6, box:0x2E6E78,
+  robot:0x2B3238, robotEdge:0xF2B632, glass:0x9FC7D1 };
+const CAR_COLORS = [0xE8E8E8,0x2C3E50,0x8E1B1B,0x1F4F8F,0x6B7378,0xC9A227,0x2E6B4F,0x111417,0xB8BEC2,0x7A2E5C];
+
+/* ================================================================ ÉTAT */
+let S;           // état de la simulation
+let G;           // géométrie dérivée
+let running = true, speed = 1;
+const scene = new THREE.Scene();
+let renderer, camera, controls, world, dyn;
+const raycaster = new THREE.Raycaster(), mouse = new THREE.Vector2();
+let selected = null, followRobot = false;
+
+function cssVar(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+const kmh = v => v/3.6;
+const fmtT = t => { const s = Math.floor(8*3600 + t); const h = Math.floor(s/3600)%24, m = Math.floor(s/60)%60, x = s%60; return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(x).padStart(2,'0')}`; };
+const fmtHM = min => `${String(Math.floor(min/60)%24).padStart(2,'0')}:${String(Math.floor(min)%60).padStart(2,'0')}`;
+const clockMin = () => 8*60 + S.t/60;
+const dist = (a,b) => Math.hypot(a.x-b.x, a.z-b.z);
+const angNorm = a => { while(a>Math.PI) a-=2*Math.PI; while(a<-Math.PI) a+=2*Math.PI; return a; };
+
+/* ================================================================ GÉOMÉTRIE DU PARKING */
+function layout(){
+  const n = H.nPlaces, perRow = Math.ceil(n/2), pw = H.placeW, pl = H.placeL, aw = 6;
+  const half = Math.floor(perRow/2), gap = 1.8, x0 = 6.5;
+  const zP = aw/2 + pl/2, zWalk = aw/2 + pl + 1.3;
+  const xOf = i => x0 + i*pw + (i>=half ? gap : 0) + pw/2;
+  const xEnd = x0 + perRow*pw + gap;
+  return { n, perRow, pw, pl, aw, half, gap, x0, xEnd, zP, zWalk, xOf,
+    laneN:-1.4, laneS:1.4, boxX:2.4, boxW:3.4, entryX:-12, spawnX:-26,
+    xCross: x0 + half*pw + gap/2, stationX: xEnd + 4.2 };
+}
+
+/* ================================================================ OUTILS 3D */
+function mat(color, o={}){ return new THREE.MeshStandardMaterial(Object.assign({color, roughness:.8, metalness:.05}, o)); }
+function box(w,h,d,m){ const me = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), m); me.castShadow = me.receiveShadow = true; return me; }
+function plane(w,d,m){ const me = new THREE.Mesh(new THREE.PlaneGeometry(w,d), m); me.rotation.x = -Math.PI/2; me.receiveShadow = true; return me; }
+function textTex(lines, o={}){
+  const cv = document.createElement('canvas'); cv.width = o.w||256; cv.height = o.h||128;
+  const c = cv.getContext('2d');
+  if(o.bg){ c.fillStyle = o.bg; c.fillRect(0,0,cv.width,cv.height); }
+  c.fillStyle = o.color||'#FFFFFF'; c.textAlign='center'; c.textBaseline='middle';
+  const n = lines.length;
+  lines.forEach((l,i)=>{ let size = 64; c.font = `600 ${size}px "Barlow Semi Condensed", Arial`;
+    while(c.measureText(l.t).width > cv.width*.92 && size > 14){ size -= 2; c.font = `600 ${size}px "Barlow Semi Condensed", Arial`; }
+    c.fillStyle = l.color || o.color || '#FFFFFF';
+    c.fillText(l.t, cv.width/2, cv.height*(i+0.5)/n); });
+  const t = new THREE.CanvasTexture(cv); t.anisotropy = 4; return {tex:t, canvas:cv, ctx:c};
+}
+function label(text, w, h, color){ const {tex} = textTex([{t:text}], {color:color||'rgba(235,238,240,.85)', w:Math.round(256*Math.max(1,w/h/2)), h:128}); const m = new THREE.MeshBasicMaterial({map:tex, transparent:true, depthWrite:false}); const p = plane(w,h,m); p.receiveShadow=false; return p; }
+
+/* ================================================================ CONSTRUCTION DE LA SCÈNE */
+function buildWorld(){
+  if(world){ scene.remove(world); world.traverse(o=>{ if(o.geometry) o.geometry.dispose(); }); }
+  if(dyn){ scene.remove(dyn); }
+  world = new THREE.Group(); dyn = new THREE.Group(); scene.add(world); scene.add(dyn);
+  const g = G, xMax = g.stationX + S.robots.length*5.2 + 4, W = xMax - (g.spawnX+4), cx = (xMax + g.spawnX+4)/2;
+  // dalle
+  const floor = plane(W, 2*g.zWalk + 4, mat(C.asphalt,{roughness:.95})); floor.position.set(cx,0,0); world.add(floor);
+  // allée de circulation des robots
+  const aisle = plane(xMax - g.spawnX, g.aw, mat(C.lane,{roughness:.9})); aisle.position.set((xMax+g.spawnX)/2, .004, 0); world.add(aisle);
+  // ligne centrale pointillée et flèches de voie
+  for(let x=g.spawnX+2; x<g.stationX-2; x+=3){ const d = box(1.4,.01,.12, mat(0xD9C24A,{emissive:0x332a00})); d.position.set(x,.012,0); d.castShadow=false; world.add(d); }
+  [[-1,'◀ voie robots'],[1,'voie robots ▶']].forEach(([s,t])=>{ for(let x=g.x0+3; x<g.xEnd; x+=12){ const l = label(t,4.2,.9,'rgba(240,242,244,.45)'); l.position.set(x,.013,s<0? g.laneS: g.laneN); world.add(l);} });
+  // places
+  S.places.forEach(p=>{
+    const grp = new THREE.Group(); grp.position.set(p.x,0,p.z); world.add(grp);
+    const ov = plane(g.pw-.22, g.pl-.25, new THREE.MeshStandardMaterial({color:C.free, transparent:true, opacity:.42, roughness:1})); ov.position.y=.015; ov.userData={kind:'place', ref:p}; grp.add(ov); p.ov = ov;
+    // marquage
+    [-1,1].forEach(s=>{ const l = box(.09,.01,g.pl, mat(C.line,{roughness:.6})); l.position.set(s*g.pw/2,.02,0); l.castShadow=false; grp.add(l); });
+    const back = box(g.pw,.01,.09, mat(C.line)); back.position.set(0,.02,p.side*g.pl/2); back.castShadow=false; grp.add(back);
+    // capteur de présence
+    const sen = new THREE.Mesh(new THREE.CylinderGeometry(.13,.13,.07,16), mat(C.free,{emissive:C.free, emissiveIntensity:.9})); sen.position.set(0,.04,p.side*(g.pl/2-.55)); grp.add(sen); p.sensor = sen;
+    // identifiant au sol
+    const lb = label(p.id,1.25,.62); lb.position.set(0,.022,-p.side*(g.pl/2-.55)); grp.add(lb);
+    // borne de recharge
+    if(p.ev){
+      const post = box(.34,1.25,.3, mat(0xE6EAEC,{roughness:.5})); post.position.set(g.pw/2-.35,.62,p.side*(g.pl/2-.2)); grp.add(post);
+      const head = box(.38,.22,.34, mat(C.charge,{emissive:C.charge, emissiveIntensity:.25})); head.position.set(g.pw/2-.35,1.2,p.side*(g.pl/2-.2)); grp.add(head); p.bHead = head;
+      const bl = label(p.borne,1.1,.55,'rgba(120,175,255,.95)'); bl.position.set(g.pw/2-.35,.025,p.side*(g.pl/2-.95)); grp.add(bl);
+      const cable = new THREE.Mesh(new THREE.CylinderGeometry(.04,.04,1.6,6), mat(0x111111)); cable.rotation.x = Math.PI/2; cable.position.set(g.pw/2-.6,.55,p.side*(g.pl/2-1.0)); cable.visible=false; grp.add(cable); p.cable = cable;
+    }
+  });
+  // piliers
+  for(let i=0;i<=g.perRow;i+=3){ [-1,1].forEach(s=>{ const x = g.x0 + i*g.pw + (i>=g.half? g.gap:0); const pi = box(.6,3.2,.6, mat(C.concrete)); pi.position.set(x,1.6,s*(g.aw/2+g.pl+.35)); world.add(pi); }); }
+  // cheminements piétons (bandes jaunes) et traversée
+  [-1,1].forEach(s=>{ const w = plane(g.xEnd - g.spawnX + 8, 1.5, mat(C.walk,{roughness:.9})); w.position.set((g.xEnd+8+g.spawnX)/2+2,.006,s*g.zWalk); world.add(w);
+    const wl = label('cheminement piéton',5,.7,'rgba(40,36,10,.75)'); wl.position.set(g.x0+1,.012,s*g.zWalk); world.add(wl); });
+  for(let k=0;k<9;k++){ const st = box(1.4,.012,.42, mat(0xF2F2F2,{roughness:.7})); st.position.set(g.xCross,.014,-g.aw/2+.35+k*.66); st.castShadow=false; world.add(st); }
+  [-1,1].forEach(s=>{ const st = plane(g.gap-.3, g.pl, mat(C.walk,{roughness:.9})); st.position.set(g.xCross,.007,s*g.zP); world.add(st); });
+  // box de dépose et box de sortie
+  S.boxes.forEach(b=>{
+    const grp = new THREE.Group(); grp.position.set(b.x,0,b.z); world.add(grp);
+    const zone = plane(g.boxW+1.6, g.pl+1.2, new THREE.MeshBasicMaterial({color:0xF2B632, transparent:true, opacity:.13, depthWrite:false})); zone.position.y=.008; grp.add(zone);
+    const fl = plane(g.boxW, g.pl, mat(C.box,{roughness:.7})); fl.position.y=.016; grp.add(fl);
+    fl.userData = {kind:'box', ref:b};
+    [-1,1].forEach(s=>{ const wall = box(.08,2.2,g.pl, mat(C.glass,{transparent:true, opacity:.28, roughness:.1})); wall.position.set(s*g.boxW/2,1.1,0); wall.castShadow=false; grp.add(wall);
+      const fr = box(.12,2.3,.12, mat(0x2B3238)); fr.position.set(s*g.boxW/2,1.15,-b.side*g.pl/2+ (b.side>0?0:0)); grp.add(fr); });
+    const top = box(g.boxW+.2,.14,.14, mat(0x2B3238)); top.position.set(0,2.3,-b.side*g.pl/2); grp.add(top);
+    const sign = label(b.name,3.2,.9,'rgba(255,255,255,.95)'); sign.rotation.set(0,0,0); sign.position.set(0,2.75,-b.side*g.pl/2); grp.add(sign);
+    const kiosk = box(.4,1.1,.4, mat(0xE6EAEC)); kiosk.position.set(-g.boxW/2-.5,.55,-b.side*(g.pl/2-.5)); grp.add(kiosk);
+    const scr = box(.36,.26,.06, mat(0x0D7480,{emissive:0x0D7480, emissiveIntensity:.6})); scr.position.set(-g.boxW/2-.5,1.0,-b.side*(g.pl/2-.5)+(-b.side)*.21); grp.add(scr);
+    if(b.turn){ const disc = new THREE.Mesh(new THREE.CylinderGeometry(2.5,2.5,.05,40), mat(0x3C4A52,{roughness:.6})); disc.position.y=.04; grp.add(disc); b.disc = disc;
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(2.5,.05,6,48), mat(0xF2B632,{emissive:0x5a4000})); ring.rotation.x=Math.PI/2; ring.position.y=.07; grp.add(ring); }
+    const scan = new THREE.Mesh(new THREE.TorusGeometry(2.6,.06,6,48), new THREE.MeshBasicMaterial({color:0x5FE3EE, transparent:true, opacity:.0})); scan.rotation.x=Math.PI/2; scan.position.y=.3; grp.add(scan); b.scan = scan;
+  });
+  // entrée
+  const gx = g.entryX + 2;
+  [-1,1].forEach(s=>{ const post = box(.5,3.4,.5, mat(0x2B3238)); post.position.set(gx,1.7,s*(g.aw/2+.3)); world.add(post); });
+  const beam = box(.5,.6,g.aw+1.1, mat(0x0D7480,{emissive:0x0D7480,emissiveIntensity:.25})); beam.position.set(gx,3.4,0); world.add(beam);
+  const ent = label('ENTRÉE · SORTIE',5.2,1.1,'#FFFFFF'); ent.rotation.set(0,0,0); ent.position.set(gx,4.35,0); world.add(ent);
+  // panneau numérique
+  const pnl = textTex([{t:''}],{w:512,h:256}); S.panel = pnl;
+  const pm = new THREE.Mesh(new THREE.PlaneGeometry(3.6,1.8), new THREE.MeshBasicMaterial({map:pnl.tex}));
+  pm.position.set(g.entryX+5.5,2.5,-g.aw/2-1.1); world.add(pm);
+  const pp = box(.18,1.6,.18, mat(0x2B3238)); pp.position.set(g.entryX+5.5,.8,-g.aw/2-1.15); world.add(pp);
+  // station des robots
+  const nR = S.robots.length, stLen = 5.4 + (nR-1)*5.2, stC = g.stationX + (nR-1)*2.6;
+  const st = plane(stLen, 7.6, mat(0x26444A,{roughness:.8})); st.position.set(stC,.01,0); world.add(st);
+  const stl = label('STATION ROBOTS',5,.9,'rgba(140,220,228,.9)'); stl.position.set(stC,.02,-2.9); world.add(stl);
+  S.robots.forEach(r=>{ const pad = plane(4.8,2.0, mat(0x335C63,{emissive:0x0a2a2e})); pad.position.set(r.home.x,.015,r.home.z); world.add(pad); });
+  // éclairage du parking
+  for(let x=g.x0; x<g.xEnd; x+=8){ const lt = box(2.4,.08,.3, mat(0xFFFFFF,{emissive:0xFFFFFF, emissiveIntensity:.7})); lt.position.set(x+2,3.6,0); lt.castShadow=false; world.add(lt); }
+  updatePanel();
+}
+
+function makeCar(car){
+  const g = new THREE.Group(), lift = new THREE.Group(); g.add(lift);
+  const L = car.L, W = car.W, col = car.color;
+  const body = box(L,.55,W, mat(col,{roughness:.35, metalness:.35})); body.position.y=.55; lift.add(body);
+  const cab = box(L*.55,.46,W*.88, mat(0x26323A,{roughness:.15, metalness:.4})); cab.position.set(-L*.05,1.03,0); lift.add(cab);
+  const roof = box(L*.5,.05,W*.86, mat(col,{roughness:.35, metalness:.35})); roof.position.set(-L*.05,1.28,0); lift.add(roof);
+  [[1,1],[1,-1],[-1,1],[-1,-1]].forEach(([a,b])=>{ const w = new THREE.Mesh(new THREE.CylinderGeometry(.34,.34,.24,16), mat(0x15191C)); w.rotation.x=Math.PI/2; w.position.set(a*L*.32,.34,b*(W/2-.08)); w.castShadow=true; lift.add(w); });
+  [-1,1].forEach(b=>{ const hl = box(.06,.12,.32, mat(0xFFFFFF,{emissive:0xFFF6D8, emissiveIntensity:.6})); hl.position.set(L/2,.62,b*W*.32); lift.add(hl);
+    const tl = box(.06,.1,.3, mat(0xB0201A,{emissive:0x701010, emissiveIntensity:.6})); tl.position.set(-L/2,.64,b*W*.32); lift.add(tl); });
+  if(car.ev){ const ev = box(L*.3,.05,.22, mat(0x29B6C8,{emissive:0x29B6C8, emissiveIntensity:.7})); ev.position.set(-L*.05,1.32,0); lift.add(ev); }
+  const tag = label(car.id,1.3,.6,'rgba(255,255,255,.95)'); tag.position.set(-L*.05,1.335,0); tag.rotation.z = -Math.PI/2; lift.add(tag);
+  g.traverse(o=>{ if(o.isMesh) o.userData = {kind:'car', ref:car}; });
+  car.mesh = g; car.lift = lift; dyn.add(g);
+}
+function makeRobot(r){
+  const g = new THREE.Group();
+  const base = box(4.3,.17,1.75, mat(C.robot,{roughness:.6, metalness:.3})); base.position.y=.12; g.add(base);
+  [-1,1].forEach(s=>{ const e = box(4.3,.05,.08, mat(C.robotEdge,{emissive:0x4a3500})); e.position.set(0,.22,s*.86); g.add(e); });
+  [[1,1],[1,-1],[-1,1],[-1,-1]].forEach(([a,b])=>{ const arm = box(.22,.1,.5, mat(0xF2B632)); arm.position.set(a*1.38,.2,b*.95); g.add(arm); });
+  const beacon = new THREE.Mesh(new THREE.CylinderGeometry(.13,.13,.18,12), mat(0x3FAE6B,{emissive:0x3FAE6B, emissiveIntensity:1})); beacon.position.set(1.85,.32,0); g.add(beacon); r.beacon = beacon;
+  const lab = label(r.id,1,.5,'rgba(255,255,255,.95)'); lab.position.set(-.6,.215,0); lab.rotation.z=-Math.PI/2; g.add(lab);
+  const piv = new THREE.Group(); g.add(piv); r.pivot = piv;
+  const sec = new THREE.Mesh(new THREE.CircleGeometry(H.detect+2.15, 28, -0.62, 1.24), new THREE.MeshBasicMaterial({color:0x5FE3EE, transparent:true, opacity:.13, depthWrite:false, side:THREE.DoubleSide}));
+  sec.rotation.x = -Math.PI/2; sec.position.set(0,.03,0); piv.add(sec); r.sector = sec;
+  g.traverse(o=>{ if(o.isMesh && o!==sec) o.userData = {kind:'robot', ref:r}; });
+  r.mesh = g; dyn.add(g);
+}
+function makePed(p){
+  const g = new THREE.Group();
+  const b = new THREE.Mesh(new THREE.CylinderGeometry(.2,.26,1.15,12), mat(p.color)); b.position.y=.78; b.castShadow=true; g.add(b);
+  const h = new THREE.Mesh(new THREE.SphereGeometry(.17,14,10), mat(0xE0B48F)); h.position.y=1.5; h.castShadow=true; g.add(h);
+  const legs = box(.36,.3,.22, mat(0x1E262C)); legs.position.y=.16; g.add(legs);
+  p.mesh = g; dyn.add(g);
+}
+
+/* ================================================================ MODÈLE */
+let ids;
+function newState(){
+  G = layout();
+  S = { t:0, places:[], boxes:[], robots:[], cars:[], peds:[], tasks:[], log:[], alerts:0, restit:[], borneRelease:[],
+        hist:{occ:[], pow:[]}, histT:0, power:0, scen:null, timeline:[], queueEntry:[], lastPanel:'' };
+  ids = {car:0, ped:0, task:0};
+  let k = 0, b = 0;
+  for(let row=0; row<2; row++){
+    const side = row===0 ? -1 : 1;
+    for(let i=0;i<G.perRow && k<G.n;i++,k++){
+      S.places.push({ id:'P'+String(k+1).padStart(2,'0'), idx:k, row, i, side, x:G.xOf(i), z:side*G.zP, state:'free', car:null, ev:false, unavailable:false });
+    }
+  }
+  // bornes sur les places les plus à droite de la rangée nord
+  const north = S.places.filter(p=>p.row===0);
+  for(let j=0;j<Math.min(H.nBornes,north.length);j++){ const p = north[north.length-1-j]; p.ev = true; p.borne = 'B'+(j+1); }
+  S.boxes = [
+    { id:'depose', name:'BOX DÉPOSE', x:G.boxX, z:-G.zP, side:-1, car:null, busy:false, turn:false },
+    { id:'sortie', name:'BOX SORTIE', x:G.boxX, z:G.zP, side:1, car:null, busy:false, turn:true }
+  ];
+  for(let i=0;i<H.nRobots;i++){
+    const hx = G.stationX + i*5.2;
+    S.robots.push({ id:'R'+(i+1), home:{x:hx, z:G.laneS}, x:hx, z:G.laneS, heading:Math.PI, v:0, path:[], phase:'idle', task:null, timer:0,
+      brake:{phase:'none', t:0, d:0, x:0, z:0, clear:0, logged:false}, km:0, motionRev:false });
+  }
+}
+function placeColor(p){
+  if(p.unavailable) return C.off;
+  return {free:C.free, occupied:C.occ, charging:C.charge, reserved:C.res}[p.state] || C.free;
+}
+function refreshPlace(p){
+  const c = placeColor(p);
+  p.ov.material.color.setHex(c);
+  p.sensor.material.color.setHex(p.state==='free'||(p.state==='reserved'&&!p.carHere)? C.free : C.occ);
+  p.sensor.material.emissive.setHex(p.state==='free'||(p.state==='reserved'&&!p.carHere)? C.free : C.occ);
+  if(p.bHead){ const on = p.state==='charging'; p.bHead.material.emissiveIntensity = on? 1.1 : .25; if(p.cable) p.cable.visible = on; }
+  updatePanel();
+}
+function setPlace(p, state, car){ p.state = state; p.car = car||null; p.carHere = state==='occupied'||state==='charging'; refreshPlace(p); }
+
+function updatePanel(){
+  if(!S || !S.panel) return;
+  const free = S.places.filter(p=>p.state==='free' && !p.unavailable && !p.ev).length;
+  const bfree = S.places.filter(p=>p.ev && p.state==='free' && !p.unavailable).length;
+  const dep = S.boxes[0].busy ? 'OCCUPÉ' : 'LIBRE';
+  const key = free+'|'+bfree+'|'+dep;
+  if(key===S.lastPanel) return; S.lastPanel = key;
+  const c = S.panel.ctx, cv = S.panel.canvas;
+  c.fillStyle='#0B1418'; c.fillRect(0,0,cv.width,cv.height);
+  c.strokeStyle='#1E3A40'; c.lineWidth=6; c.strokeRect(3,3,cv.width-6,cv.height-6);
+  c.textAlign='left'; c.textBaseline='middle';
+  c.fillStyle='#8FD3DA'; c.font='600 34px "Barlow Semi Condensed", Arial'; c.fillText('PLACES LIBRES',24,46);
+  c.fillStyle= free>0 ? '#5BE08A' : '#FF6B5E'; c.font='700 110px "Barlow Semi Condensed", Arial'; c.textAlign='right'; c.fillText(String(free),488,70);
+  c.textAlign='left'; c.font='500 30px "Barlow Semi Condensed", Arial';
+  c.fillStyle='#7FB2FF'; c.fillText('Bornes libres : '+bfree,24,160);
+  c.fillStyle= dep==='LIBRE' ? '#5BE08A' : '#F2B632'; c.fillText('Box dépose : '+dep,24,210);
+  S.panel.tex.needsUpdate = true;
+}
+
+/* ================================================================ JOURNAL */
+function log(msg, cls){ S.log.unshift({t:S.t, msg, cls:cls||''}); if(S.log.length>80) S.log.pop(); renderLog(); }
+function renderLog(){ $('#log').innerHTML = S.log.map(e=>`<div><time>${fmtT(e.t).slice(0,8)}</time><span class="${e.cls}">${e.msg}</span></div>`).join(''); }
+function step(msg){ $('#bnStep').textContent = msg ? '▸ '+msg : ''; }
+
+/* ================================================================ VÉHICULES */
+function newCar(o){
+  ids.car++;
+  const car = Object.assign({ id:'V'+String(ids.car).padStart(2,'0'), mode:'valet', ev:false, mass:1550, L:4.3, W:1.8, soc:25, socShown:25, target:80, dep:11*60,
+    passenger:false, color:CAR_COLORS[(ids.car*3)%CAR_COLORS.length], state:'arriving', x:G.spawnX, z:G.laneN, heading:0, v:0, path:[], place:null,
+    wantCharge:false, charged:false, energy:0, chargeClock:0, task:null, tReq:null, lock:false }, o||{});
+  if(car.ev && car.soc < car.target) car.wantCharge = true;
+  car.L = Math.min(car.L, 5.8); car.W = Math.min(car.W, 2.4);
+  S.cars.push(car); makeCar(car); syncMesh(car);
+  return car;
+}
+function syncMesh(o){ if(!o.mesh) return; o.mesh.position.set(o.x,0,o.z); o.mesh.rotation.y = -o.heading; }
+
+function chooseClassic(pref){ // pref: 'valet' -> rangée nord près du box ; 'self' -> rangée sud près de l'entrée
+  const free = S.places.filter(p=>p.state==='free' && !p.unavailable && !p.ev);
+  if(!free.length) return null;
+  free.sort((a,b)=>{ const ra = pref==='valet' ? (a.row===0?0:1) : (a.row===1?0:1), rb = pref==='valet' ? (b.row===0?0:1) : (b.row===1?0:1); return ra-rb || a.x-b.x; });
+  return free[0];
+}
+function freeBorne(){ return S.places.find(p=>p.ev && p.state==='free' && !p.unavailable) || null; }
+
+function arrive(car){
+  car.x = G.spawnX - S.queueEntry.length*7; car.z = G.laneN; car.heading = 0; syncMesh(car);
+  if(car.mode==='self'){
+    const p = chooseClassic('self');
+    if(!p){ log(`${car.id} : parking complet, le conducteur repart.`,'warn'); car.state='leaving'; car.path = [{x:G.spawnX-30, z:G.laneN}]; return; }
+    setPlace(p,'reserved',car); car.place = p; car.state = 'selfParking';
+    car.path = route(car, p);
+    log(`${car.id} (stationnement libre) : guidage vers ${p.id}.`,'');
+  } else {
+    car.state = 'queueBox'; S.queueEntry.push(car);
+    log(`${car.id} (voiturier) arrive à l'entrée.`,'');
+  }
+}
+
+/* trajet : sortie de place (marche arrière), voie de l'allée selon le sens, entrée en place (marche avant) */
+function route(a, b, opt={}){
+  const dir = Math.sign(b.x - a.x) || 1, lane = dir>0 ? G.laneN : G.laneS;
+  const pts = [];
+  const inA = Math.abs(a.z) > G.aw/2 - .2, inB = Math.abs(b.z) > G.aw/2 - .2;
+  if(inA) pts.push({x:a.x, z:lane, rev:!opt.forwardOut});
+  else if(Math.abs(a.z-lane)>.05) pts.push({x:a.x, z:lane});
+  pts.push({x:b.x, z:lane});
+  pts.push({x:b.x, z:b.z});
+  const out = [];
+  let prev = a;
+  pts.forEach(p=>{ if(dist(prev,p)>.05){ out.push(p); prev = p; } });
+  return out;
+}
+
+/* mouvement le long d'une liste de points : pivot sur place puis avance */
+function moveAgent(ag, dt, vmax, accel){
+  if(!ag.path.length){ ag.v = 0; return true; }
+  const wp = ag.path[0];
+  const dx = wp.x - ag.x, dz = wp.z - ag.z, d = Math.hypot(dx,dz);
+  if(d < .02){ ag.path.shift(); return !ag.path.length; }
+  let want = Math.atan2(dz,dx); if(wp.rev) want += Math.PI;
+  const diff = angNorm(want - ag.heading);
+  ag.motionRev = !!wp.rev;
+  if(Math.abs(diff) > .03){
+    ag.v = Math.max(0, ag.v - 4*dt);
+    if(ag.v < .05){ const tr = (ag.turn||1.6)*dt; ag.heading = angNorm(ag.heading + Math.sign(diff)*Math.min(Math.abs(diff),tr)); }
+    else { const s = ag.v*dt; ag.x += dx/d*s; ag.z += dz/d*s; }
+    return false;
+  }
+  ag.heading = want;
+  ag.v = vmax <= ag.v ? vmax : Math.min(vmax, ag.v + (accel||1)*dt);
+  const remain = d; const brakeD = ag.v*ag.v/(2*1.2);
+  if(remain < brakeD && ag.path.length===1) ag.v = Math.max(.25, Math.min(ag.v, Math.sqrt(2*1.2*remain)));
+  const s = Math.min(ag.v*dt, d);
+  ag.x += dx/d*s; ag.z += dz/d*s; ag.km += s||0;
+  if(d - s < .02){ ag.x = wp.x; ag.z = wp.z; ag.path.shift(); }
+  return !ag.path.length;
+}
+
+/* ================================================================ TÂCHES DU ROBOT */
+const PRIO = {restitution:0, depose:1, fromBorne:2, toBorne:3};
+const TASK_LABEL = {restitution:'Restitution', depose:'Prise en charge', fromBorne:'Libération de borne', toBorne:'Transfert vers borne'};
+function addTask(type, car, extra){ const t = Object.assign({id:++ids.task, type, car, state:'pending', created:S.t}, extra||{}); S.tasks.push(t); car.task = t; return t; }
+function pickupPos(car){ return {x:car.x, z:car.z}; }
+
+function destFor(task){
+  const car = task.car;
+  if(task.type==='restitution'){ const b = S.boxes[1]; return b.busy ? null : b; }
+  if(task.type==='toBorne') return freeBorne();
+  if(task.type==='fromBorne') return chooseClassic('valet');
+  if(task.type==='depose'){
+    if(car.wantCharge && !waitingEVs().length){ const fb = freeBorne(); if(fb) return fb; }
+    return chooseClassic('valet');
+  }
+}
+function dispatch(){
+  const idle = S.robots.filter(r=>r.phase==='idle'||r.phase==='returning');
+  if(!idle.length) return;
+  const pend = S.tasks.filter(t=>t.state==='pending' && !t.car.lock && !t.forced).sort((a,b)=>PRIO[a.type]-PRIO[b.type] || a.created-b.created);
+  for(const t of pend){
+    const free = S.robots.filter(r=>r.phase==='idle'||r.phase==='returning');
+    if(!free.length) break;
+    const dest = destFor(t);
+    if(!dest){ if(!t.warned){ t.warned = true; log(t.type==='restitution' ? `${t.car.id} : box de sortie occupé, restitution en attente.` : `${t.car.id} : aucune place libre adaptée, opération en attente.`,'warn'); } continue; }
+    const car = t.car; const pk = pickupPos(car);
+    free.sort((a,b)=>dist(a,pk)-dist(b,pk));
+    const r = free[0];
+    t.state = 'active'; t.robot = r; t.dest = dest; r.task = t;
+    if(dest.turn !== undefined){ dest.busy = true; dest.car = car; }
+    else { setPlace(dest,'reserved',car); dest.carHere = false; refreshPlace(dest); }
+    if(car.place) { car.place.state = car.place.state; }
+    r.phase = 'toPickup'; r.path = route(r, pk);
+    log(`${r.id} affecté : ${TASK_LABEL[t.type].toLowerCase()} de ${car.id} → ${dest.id==='sortie'?'box de sortie':dest.id}.`,'');
+    if(t.type==='depose') step(`${r.id} se dirige vers le box de dépose`);
+    if(t.type==='restitution') step(`Position de ${car.id} trouvée (${car.place?car.place.id:'?'}), ${r.id} va le chercher`);
+  }
+}
+
+function robotDone(r){
+  const t = r.task; r.task = null;
+  if(t) t.state = 'done';
+  r.phase = 'exiting'; r.path = [{x:r.x, z: r.z<0 ? G.laneN : G.laneS, rev:true}];
+  if(Math.abs(r.z) < G.aw/2) r.path = [];
+}
+
+function updateRobot(r, dt){
+  const vL = kmh(H.vLoaded), vE = kmh(H.vEmpty);
+  const t = r.task;
+  // détection d'obstacle et freinage (FT1.4)
+  let obstacle = null;
+  const moving = r.path.length>0 && !['lifting','lowering'].includes(r.phase);
+  if(moving) obstacle = detect(r);
+  const b = r.brake;
+  r.sector.material.color.setHex(obstacle ? 0xFF5A4E : 0x5FE3EE); r.sector.material.opacity = obstacle ? .28 : .13;
+  r.pivot.rotation.y = r.motionRev ? Math.PI : 0;
+  let vcap = (r.phase==='carrying'||r.phase==='enterDrop') ? vL : vE;
+  if(obstacle){
+    b.clear = 0;
+    if(b.phase==='none'){ b.phase='reaction'; b.t=H.reaction; b.x=r.x; b.z=r.z; b.v0=r.v; b.logged=false;
+      if(r.v > .05){ S.alerts++; log(`⚠ ${r.id} : ${obstacle.what} détecté à ${obstacle.d.toFixed(1)} m, arrêt de sécurité.`,'alert'); step(`${r.id} freine : ${obstacle.what} sur la trajectoire`); }
+    }
+    if(b.phase==='reaction'){ b.t -= dt; vcap = r.v; if(b.t<=0) b.phase='decel'; }
+    else if(b.phase==='decel' || b.phase==='stopped'){
+      const v0 = Math.max(b.v0||0, .1), rem = Math.max(.15, H.stopMax*.95 - v0*H.reaction);
+      const a = Math.max(.5, (v0*v0)/(2*rem));   // décélération nécessaire pour tenir la distance d'arrêt (réaction comprise)
+      r.v = Math.max(0, r.v - a*dt); vcap = r.v;
+      if(r.v===0 && b.phase==='decel'){ b.phase='stopped'; const dd = Math.hypot(r.x-b.x, r.z-b.z); if(b.v0>.05 && !b.logged){ b.logged=true; log(`${r.id} arrêté : temps de réaction ${H.reaction} s, distance parcourue ${dd.toFixed(2)} m (max ${H.stopMax} m).`, dd<=H.stopMax+.3?'ok':'alert'); } }
+    }
+  } else if(b.phase!=='none'){
+    b.clear += dt; vcap = 0;
+    if(b.clear > .8){ b.phase='none'; if(b.v0>.05) log(`${r.id} : voie libre, reprise du déplacement.`,'ok'); }
+  }
+  // comportement selon la phase
+  switch(r.phase){
+    case 'idle': r.v=0; break;
+    case 'returning': if(moveAgent(r,dt,vcap,1)){ r.phase='idle'; r.heading = Math.PI; } break;
+    case 'exiting': if(moveAgent(r,dt,vcap,1)){ r.phase='returning'; r.path = route(r, r.home); r.path.push({x:r.home.x-.01, z:r.home.z}); } break;
+    case 'toPickup':
+      if(moveAgent(r,dt,vcap,1)){ r.phase='lifting'; r.timer=1.3; step(`${r.id} se glisse sous ${t.car.id} et soulève le véhicule par les roues`); }
+      break;
+    case 'lifting': {
+      r.timer -= dt; const car = t.car; car.lift.position.y = Math.min(.14, (1.3-r.timer)/1.3*.14);
+      if(r.timer<=0){
+        // libération de l'emplacement de départ
+        if(car.place){ const p = car.place; if(p.ev && car.tCharged!=null){ car.tReleased = S.t; S.borneRelease.push(S.t - car.tCharged); } setPlace(p,'free',null); car.place=null; }
+        if(car.inBox){ const bx = car.inBox; bx.busy=false; bx.car=null; car.inBox=null; updatePanel(); }
+        car.state='carried'; r.phase='carrying'; r.path = route(r, t.dest);
+        step(`${r.id} transporte ${car.id} vers ${t.dest.id==='sortie'?'le box de sortie':t.dest.id} (≤ ${H.vLoaded} km/h)`);
+      }
+      break; }
+    case 'carrying':
+      if(moveAgent(r,dt,vcap,.6)){ r.phase='lowering'; r.timer=1.2; }
+      break;
+    case 'lowering': {
+      r.timer -= dt; const car = t.car; car.lift.position.y = Math.max(0, r.timer/1.2*.14);
+      if(r.timer<=0){ dropCar(r,t); robotDone(r); }
+      break; }
+  }
+  // le véhicule suit le robot
+  if(t && ['carrying','lowering'].includes(r.phase) || (t && r.phase==='lifting' && r.timer<.9)){ const car = t.car; car.x = r.x; car.z = r.z; car.heading = r.heading; syncMesh(car); }
+  syncMesh(r);
+  const col = obstacle ? 0xFF5A4E : (r.phase==='idle' ? 0x3FAE6B : (r.phase==='carrying'||r.phase==='lifting'||r.phase==='lowering' ? 0xF2B632 : 0x5FE3EE));
+  r.beacon.material.color.setHex(col); r.beacon.material.emissive.setHex(col);
+}
+
+function detect(r){
+  const dirA = r.heading + (r.motionRev ? Math.PI : 0), dx = Math.cos(dirA), dz = Math.sin(dirA);
+  const front = 2.15; // demi-longueur du robot chargé
+  let best = null;
+  const check = (o, what, lat) => {
+    const ox = o.x - r.x, oz = o.z - r.z; const along = ox*dx + oz*dz - front, lateral = Math.abs(-ox*dz + oz*dx);
+    if(along > -0.3 && along <= H.detect && lateral < (lat||1.5)){ if(!best || along < best.d) best = {d:Math.max(0,along), what}; }
+  };
+  S.peds.forEach(p=>{ if(!p.inCar) check(p, 'piéton', 1.6); });
+  S.robots.forEach(o=>{ if(o===r) return; if(o.phase==='idle' && Math.hypot(o.x-o.home.x, o.z-o.home.z)<.5 && Math.abs(o.x - r.x) > 3) return; if(o.brake.phase!=='none' && o.blockedBy===r.id && r.id<o.id) return;
+    if(r.ignore===o.id && S.t < r.ignoreUntil) return;
+    const before = best; check(o,'robot '+o.id,1.7); if(best!==before) r.blockedBy = o.id; });
+  S.cars.forEach(c=>{ if(c.state==='selfParking'||c.state==='leaving'||c.state==='queueBox'||c.state==='toBox'){ check(c,'véhicule '+c.id,1.7); } });
+  if(!best){ r.blockedBy = null; r.blockT = 0; }
+  else if(best.what.startsWith('robot')){ r.blockT = (r.blockT||0) + 1/50; const o = S.robots.find(x=>x.id===r.blockedBy);
+    if(r.blockT > 4 && o && o.v < .05){ r.ignore = o.id; r.ignoreUntil = S.t + 6; r.blockT = 0; log(`${r.id} et ${o.id} se croisent : priorité donnée à ${r.id}.`,''); } }
+  return best;
+}
+
+function dropCar(r,t){
+  const car = t.car, d = t.dest;
+  car.lift.position.y = 0;
+  if(d.turn !== undefined){ // box de sortie
+    car.inBox = d; car.state='turning'; car.turnT = 0; car.turnFrom = car.heading;
+    const dt = S.t - (car.tReq||S.t); car.restitTime = dt; S.restit.push(dt);
+    log(`${car.id} déposé au box de sortie en ${fmtDur(dt)} (objectif ≤ ${fmtDur(H.restitObj)}).`, dt<=H.restitObj?'ok':'warn');
+    step(`Le plateau tournant oriente ${car.id} vers la sortie`);
+  } else {
+    car.place = d; car.state='parked'; car.tPark = S.t;
+    if(d.ev && car.wantCharge && !car.charged){ setPlace(d,'charging',car); car.state='charging'; log(`${car.id} raccordé à la borne ${d.borne} (Type 2), recharge de ${Math.round(car.socShown)} % vers ${car.target} %.`,'charge'); step(`${car.id} en recharge sur ${d.borne}`); }
+    else { setPlace(d,'occupied',car); log(`${car.id} stationné en ${d.id} par ${r.id}.`,'ok'); if(t.type==='depose') step(`${car.id} déposé en ${d.id}, place mise à jour (capteur : occupée)`); }
+    if(t.type==='fromBorne'){ const rel = car.tReleased!=null ? car.tReleased : S.t; log(`Borne libérée ${fmtDur(rel - (car.tCharged||rel))} après la fin de charge : ${car.id} déplacé vers ${d.id}, conducteur informé de sa nouvelle place.`,'charge'); }
+  }
+  car.task = null;
+}
+function fmtDur(s){ s = Math.round(s); return s>=60 ? `${Math.floor(s/60)} min ${String(s%60).padStart(2,'0')} s` : `${s} s`; }
+
+/* ================================================================ CYCLE DE VIE DES VÉHICULES */
+function updateCar(car, dt){
+  const vC = kmh(H.vCar);
+  // les véhicules conduits s'arrêtent derrière un obstacle
+  const driving = ['selfParking','leaving','queueBox','toBox','exitBox'].includes(car.state);
+  let vcap = vC;
+  if(driving && car.path.length){ if(carBlocked(car)){ car.blockT = (car.blockT||0) + dt; if(car.blockT < 5){ vcap = 0; car.v = Math.max(0, car.v - 4*dt); } else vcap = .6; } else car.blockT = 0; }
+  switch(car.state){
+    case 'selfParking':
+      if(moveAgent(car,dt,vcap,1.5)){ const p = car.place; setPlace(p,'occupied',car); car.state='parked'; log(`${car.id} garé en ${p.id} par son conducteur (capteur : occupée).`,'ok'); step(`${car.id} stationné en ${p.id}, le conducteur rejoint le cheminement piéton`); spawnDriverWalk(car,'out'); }
+      break;
+    case 'queueBox': {
+      const qi = S.queueEntry.indexOf(car), bx = S.boxes[0];
+      if(qi===0 && !bx.busy){ bx.busy = true; bx.car = car; S.queueEntry.shift(); car.state='toBox'; car.path = route(car, bx); updatePanel(); step(`${car.id} entre dans le box de dépose`); }
+      else { const tx = G.entryX - 2 - qi*6.5; if(car.x < tx - .1) moveAgent(Object.assign(car,{path:[{x:tx,z:G.laneN}]}),dt,vcap,1.5); else car.v=0; }
+      break; }
+    case 'toBox':
+      if(moveAgent(car,dt,vcap,1.5)){ car.inBox = S.boxes[0]; car.state='driverOut'; car.timer=1.2; log(`${car.id} arrêté dans le box de dépose, moteur coupé.`,''); step(`Le conducteur de ${car.id} descend et valide la dépose`); spawnDriverWalk(car,'out'); }
+      break;
+    case 'driverOut': car.timer-=dt; if(car.timer<=0){ car.state='checking'; car.timer=3.2; log(`Dépose de ${car.id} validée à la borne du box. Vérification de sécurité en cours.`,''); step(`Vérification : personne à bord, masse ${car.mass} kg, gabarit ${car.L.toFixed(1)} × ${car.W.toFixed(2)} m`); } break;
+    case 'checking': {
+      car.timer -= dt; const sc = S.boxes[0].scan; sc.material.opacity = .55; sc.position.y = .2 + (Math.sin(S.t*4)+1)*.7;
+      if(car.timer<=0){
+        sc.material.opacity = 0;
+        const reasons = [];
+        if(car.mass > H.massMax) reasons.push(`masse ${car.mass} kg > ${H.massMax} kg`);
+        if(car.L > H.lMax || car.W > H.wMax) reasons.push(`gabarit ${car.L.toFixed(1)} × ${car.W.toFixed(2)} m > ${H.lMax} × ${H.wMax} m`);
+        if(reasons.length){ S.alerts++; log(`✕ ${car.id} refusé : ${reasons.join(', ')}. Le conducteur reprend son véhicule.`,'alert'); step(`Prise en charge refusée : ${reasons.join(', ')}`); car.state='refused'; car.timer=2.5; spawnDriverWalk(car,'in'); break; }
+        if(car.passenger){ S.alerts++; log(`⚠ ${car.id} : personne détectée à bord. Prise en charge suspendue.`,'alert'); step('Personne détectée à bord : le passager est invité à descendre'); car.passenger=false; car.state='driverOut'; car.timer=4; spawnPassenger(car); break; }
+        log(`${car.id} : vérification réussie (aucune personne détectée, masse et gabarit conformes).`,'ok');
+        car.state='waitPickup'; addTask('depose',car); step(`Demande de prise en charge envoyée aux robots`);
+      }
+      break; }
+    case 'refused': break;
+    case 'turning': {
+      const b = car.inBox; car.turnT += dt/2.2; const k = Math.min(1,car.turnT);
+      car.heading = car.turnFrom + Math.PI*k; if(b.disc) b.disc.rotation.y = -car.heading; syncMesh(car);
+      if(k>=1){ car.state='ready'; log(`${car.id} prêt au box de sortie : conducteur notifié.`,'ok'); step(`${car.id} prêt : le conducteur récupère son véhicule`); spawnDriverWalk(car,'in'); }
+      break; }
+    case 'exitBox': case 'leaving':
+      if(moveAgent(car,dt,vcap,1.5)){ car.state='gone'; }
+      break;
+  }
+  if(car.state==='charging') chargeStep(car, dt);
+  syncMesh(car);
+}
+function carBlocked(car){
+  const dx = Math.cos(car.heading + (car.motionRev?Math.PI:0)), dz = Math.sin(car.heading + (car.motionRev?Math.PI:0));
+  const near = (o, lim) => { const ox=o.x-car.x, oz=o.z-car.z, a = ox*dx+oz*dz - car.L/2, l = Math.abs(-ox*dz+oz*dx); return a>-.2 && a<lim && l<1.5; };
+  if(S.peds.some(p=>!p.inCar && near(p,3))) return true;
+  if(S.robots.some(r=>r.path.length && near(r,3.5))) return true;
+  if(S.cars.some(c=>c!==car && c.state!=='gone' && ['selfParking','leaving','queueBox','toBox','exitBox','carried'].includes(c.state) && near(c,3))) return true;
+  return false;
+}
+
+/* piétons : conducteurs et passagers */
+function spawnPed(o){ ids.ped++; const p = Object.assign({id:'H'+ids.ped, x:0, z:0, heading:0, v:0, path:[], color:0x4E6E8E, after:null, km:0, turn:7}, o); S.peds.push(p); makePed(p); syncMesh(p); return p; }
+function walkway(z){ return Math.sign(z||-1)*G.zWalk; }
+function spawnDriverWalk(car, dir){
+  const wz = walkway(car.z), side = car.x;
+  if(dir==='out'){
+    const p = spawnPed({x:car.x+ (car.inBox? -G.boxW/2-.6 : 0), z:car.z, color:0x3D6D9A});
+    p.path = [{x:p.x, z:wz},{x:G.entryX-3, z:wz},{x:G.entryX-8, z:wz}]; p.after = 'despawn';
+  } else {
+    const p = spawnPed({x:G.entryX-6, z:wz, color:0x3D6D9A});
+    const tx = car.inBox ? car.x - G.boxW/2 - .6 : car.x;
+    p.path = [{x:tx, z:wz},{x:tx, z:car.z + Math.sign(car.z)*(-.5)}]; p.after = 'boardCar'; p.car = car;
+  }
+}
+function spawnPassenger(car){ const p = spawnPed({x:car.x - G.boxW/2 - .6, z:car.z, color:0x9A5B3D}); p.path=[{x:p.x, z:walkway(car.z)},{x:G.entryX-8, z:walkway(car.z)}]; p.after='despawn'; log(`Le passager de ${car.id} descend et rejoint le cheminement piéton.`,''); }
+function updatePed(p, dt){
+  if(p.wait){ p.wait -= dt; if(p.wait>0) return; p.wait = 0; if(p.afterWait) { p.afterWait(); p.afterWait=null; } }
+  if(moveAgent(p, dt, p.speed||H.vPed||1.3, 3)){
+    if(p.after==='despawn'){ p.dead = true; }
+    else if(p.after==='boardCar'){ const car = p.car; p.dead = true; boardAndLeave(car); }
+    else if(p.after==='visit'){ p.after = 'despawn'; p.wait = 4; p.afterWait = ()=>{ log(`Le conducteur de ${p.car.id} a récupéré son objet et repart à pied. Zone de sécurité levée.`,'ok'); p.car.lock=false; step(''); p.path=[{x:p.x, z:walkway(p.z)},{x:G.entryX-8, z:walkway(p.z)}]; }; }
+    else if(p.after==='cross'){ p.wait = p.pause||0; p.pause = 0; p.after = 'despawn'; p.path = p.rest||[]; if(!p.path.length) p.dead=true; }
+  }
+  syncMesh(p);
+}
+function boardAndLeave(car){
+  if(car.state==='refused'){ const b = S.boxes[0]; car.state='exitBox'; car.path = route(car, {x:G.spawnX-30, z:G.laneS}); b.busy=false; b.car=null; car.inBox=null; updatePanel(); step(''); return; }
+  if(car.state==='ready'){ const b = car.inBox; car.state='exitBox'; car.path = route(car,{x:G.spawnX-30, z:G.laneS},{forwardOut:true}); car.onLeave = ()=>{ b.busy=false; b.car=null; }; car.inBox=null; log(`${car.id} quitte le parking.`,''); step(`${car.id} quitte le box de sortie`); return; }
+  if(car.state==='parked' && car.mode==='self'){ const p = car.place; car.state='leaving'; car.path = route(car,{x:G.spawnX-30, z:G.laneS}); setPlace(p,'free',null); car.place=null; log(`${car.id} quitte ${p.id} (place libérée).`,''); return; }
+}
+
+/* ================================================================ RECHARGE PARTAGÉE (F2) */
+function waitingEVs(){ return S.cars.filter(c=>c.wantCharge && !c.charged && c.state==='parked' && c.place && !c.place.ev && !c.task).sort((a,b)=>a.dep-b.dep); }
+function chargingCars(){ return S.cars.filter(c=>c.state==='charging').sort((a,b)=>a.dep-b.dep); }
+function allocatePower(){
+  let rem = H.pAvail; S.power = 0;
+  chargingCars().forEach(c=>{ const p = Math.max(0, Math.min(H.pBorne, rem)); c.pw = p; rem -= p; S.power += p; });
+}
+function chargeStep(car, dt){
+  const ct = dt * H.chargeAccel; car.chargeClock += ct;
+  car.soc = Math.min(100, car.soc + (car.pw||0) * ct / 3600 / H.battery * 100);
+  if(car.chargeClock >= H.socStep){ car.chargeClock -= H.socStep; car.socShown = car.soc; }
+  if(car.soc >= car.target){
+    car.socShown = car.soc; car.charged = true; car.wantCharge = false; car.state = 'parked'; car.tCharged = S.t; car.pw = 0;
+    setPlace(car.place,'occupied',car);
+    log(`${car.id} chargé à ${Math.round(car.soc)} % sur ${car.place.borne} : demande de libération de la borne.`,'charge');
+    addTask('fromBorne', car);
+  }
+}
+function planCharging(){
+  const q = waitingEVs();
+  for(const car of q){
+    const pendingTo = S.tasks.filter(t=>t.type==='toBorne' && t.state==='pending').length;
+    const fb = S.places.filter(p=>p.ev && p.state==='free' && !p.unavailable).length;
+    if(fb - pendingTo <= 0) break;
+    addTask('toBorne', car); log(`${car.id} (départ ${fmtHM(car.dep)}) prioritaire : transfert vers une borne demandé.`,'charge');
+  }
+}
+
+/* ================================================================ COMMANDES */
+function addVehicle(o){ const car = newCar(o); arrive(car); return car; }
+function requestValet(o){ return addVehicle(Object.assign({mode:'valet'}, o||{})); }
+function requestRestitution(car){
+  if(!car){ car = S.cars.filter(c=>c.mode==='valet' && ['parked','charging'].includes(c.state) && !c.task).sort((a,b)=>a.tPark-b.tPark)[0]; }
+  if(!car){ log('Aucun véhicule confié au voiturier n\'est disponible pour une restitution.','warn'); return; }
+  if(car.mode!=='valet'){ log(`${car.id} est en stationnement libre : son conducteur le reprend lui-même.`,'warn'); return; }
+  if(car.task){ if(car.task.state==='pending' && car.task.type!=='restitution'){ S.tasks = S.tasks.filter(t=>t!==car.task); car.task=null; } else { log(`${car.id} est déjà en cours de déplacement, demande prise en compte à la fin de l'opération.`,'warn'); return; } }
+  if(car.state==='charging'){ car.state='parked'; setPlace(car.place,'occupied',car); car.wantCharge=false; car.pw=0; log(`${car.id} : recharge interrompue à ${Math.round(car.soc)} % pour la restitution.`,'charge'); }
+  car.tReq = S.t; addTask('restitution', car);
+  log(`Demande de restitution de ${car.id} reçue depuis l'application.`,'');
+  step(`Recherche de la position de ${car.id}…`);
+  select({kind:'car', ref:car});
+}
+function simulateCharge(){
+  const dep = Math.round(clockMin() + 90 + Math.random()*120);
+  return requestValet({ev:true, soc:Math.round(15+Math.random()*25), target:80, dep});
+}
+function simulateObstacle(){
+  const mv = S.robots.filter(r=>r.path.length && Math.abs(r.z)<G.aw/2 && !['lifting','lowering'].includes(r.phase));
+  let x, from, to;
+  if(mv.length){
+    const r = mv.sort((a,b)=>b.path.length-a.path.length)[0];
+    const far = r.path.find(w=>Math.abs(w.x-r.x)>1) || r.path[r.path.length-1];
+    const dir = Math.sign(far.x - r.x) || 1;
+    x = r.x + dir*(H.detect + 5); x = Math.max(G.entryX+2, Math.min(G.stationX-3, x));
+    var s = r.z < 0 || dir > 0 ? -1 : 1;
+    log(`Un piéton traverse la voie devant ${r.id}.`,'warn');
+  } else { x = G.xCross; var s = -1; log('Un piéton traverse l\'allée au passage piéton.','warn'); }
+  const p = spawnPed({x, z:s*(G.aw/2+.3), color:0xB23A48, speed:1.1});
+  p.path = [{x, z:s*.0}]; p.after='cross'; p.pause = 2.5; p.rest = [{x, z:-s*(G.zWalk)},{x:G.entryX-8, z:-s*G.zWalk}];
+  step('Piéton sur la trajectoire : le robot doit détecter, freiner et attendre');
+}
+function walkToCar(car){
+  if(!car.place){ log(`${car.id} n'est pas sur une place.`,'warn'); return; }
+  car.lock = true; S.tasks.filter(t=>t.car===car && t.state==='pending').forEach(t=>t.deferred=true);
+  const wz = walkway(car.z);
+  const p = spawnPed({x:G.entryX-6, z:wz, color:0x3D6D9A}); p.car = car;
+  p.path = [{x:car.x+.0, z:wz},{x:car.x, z:car.z + Math.sign(car.z)*(H.placeL/2+.1)}]; p.after='visit';
+  log(`Le conducteur de ${car.id} se rend à pied à son véhicule (${car.place.id}). Opérations sur ce véhicule suspendues.`,'');
+  step(`Accès piéton : l'application guide le conducteur jusqu'à ${car.place.id}`);
+}
+function selfLeave(car){ if(car.mode!=='self'||car.state!=='parked') return; const wz = walkway(car.z); const p = spawnPed({x:G.entryX-6, z:wz, color:0x3D6D9A}); p.path=[{x:car.x, z:wz},{x:car.x, z:car.z+Math.sign(car.z)*(H.placeL/2-.2)}]; p.after='boardCar'; p.car=car; log(`Le conducteur de ${car.id} revient à pied pour repartir.`,''); }
+
+/* ================================================================ PLACEMENT DIRECT (état initial et scénarios) */
+function parkNow(o, place, charging){
+  const car = newCar(o); car.x = place.x; car.z = place.z; car.heading = place.side<0 ? -Math.PI/2 : Math.PI/2; car.place = place; car.tPark = S.t - Math.random()*600;
+  if(charging && place.ev){ car.state='charging'; setPlace(place,'charging',car); } else { car.state='parked'; setPlace(place,'occupied',car); }
+  syncMesh(car); return car;
+}
+
+/* ================================================================ SCÉNARIOS */
+const SCEN = [
+  {k:'1', t:'Stationnement classique', d:'Un conducteur arrive, consulte les places libres sur le panneau et se gare lui-même, guidé par l\'application.', run(){ seedBase(6); at(1, ()=>addVehicle({mode:'self'})); }},
+  {k:'2', t:'Voiturier automatique', d:'Un conducteur dépose sa voiture dans le box. Après vérification de sécurité, un robot la transporte vers une place libre.', run(){ seedBase(6); at(1, ()=>requestValet()); }},
+  {k:'3', t:'Restitution', d:'Un conducteur demande son véhicule depuis l\'application. Le robot le ramène au box de sortie, le plateau tournant l\'oriente vers la sortie.', run(){ seedBase(5); const p = S.places.filter(p=>p.row===0 && !p.ev && p.state==='free').sort((a,b)=>b.x-a.x)[0] || chooseClassic('valet'); const c = parkNow({mode:'valet'}, p); at(1.5, ()=>requestRestitution(c)); }},
+  {k:'4', t:'Recharge partagée', d:'Plusieurs véhicules électriques attendent leur tour. Le système les place sur les bornes selon leur heure de départ et la puissance disponible.', run(){
+      seedBase(4); const cls = S.places.filter(p=>!p.ev && p.row===1);
+      const mins = clockMin();
+      [[18,80,95],[30,90,40],[12,70,150],[40,85,70],[22,80,120]].forEach(([s,tg,dm],i)=>{ if(cls[i+2]) parkNow({mode:'valet', ev:true, soc:s, socShown:s, target:tg, dep:Math.round(mins+dm)}, cls[i+2]); });
+      log(`Puissance disponible ${H.pAvail} kW, ${H.pBorne} kW par borne : au plus ${Math.floor(H.pAvail/H.pBorne)} recharges à pleine puissance en même temps.`,'charge'); }},
+  {k:'5', t:'Situation de sécurité', d:'Pendant le transport d\'un véhicule, un piéton traverse la voie du robot. Le robot détecte l\'obstacle, freine et attend que la voie soit libre.', run(){ seedBase(5); const p = S.places.filter(p=>p.row===0 && !p.ev && p.state==='free').sort((a,b)=>b.x-a.x)[0]; requestValet(); S.forceDest = p; S.watchObstacle = true; }},
+  {k:'6', t:'Parking fortement occupé', d:'Plusieurs véhicules arrivent en même temps, en stationnement libre ou en voiturier, dont un trop lourd. Le système organise les déplacements et l\'affectation des places.', run(){
+      seedBase(9);
+      const list = [{mode:'valet'},{mode:'self'},{mode:'valet', ev:true, soc:20, target:80, dep:Math.round(clockMin()+80)},{mode:'self'},{mode:'valet', mass:2850, L:5.1, W:2.05},{mode:'valet'},{mode:'self'},{mode:'valet', ev:true, soc:35, target:90, dep:Math.round(clockMin()+140)},{mode:'valet'}];
+      list.forEach((o,i)=>at(1+i*2.2, ()=> o.mode==='self' ? addVehicle(o) : requestValet(o)));
+      at(14, ()=>{ const c = S.cars.find(c=>c.mode==='valet' && c.state==='parked' && !c.task); if(c) requestRestitution(c); }); }},
+];
+function at(dt, fn){ S.timeline.push({t:S.t+dt, fn}); }
+function seedBase(n){
+  const order = S.places.filter(p=>!p.ev).sort((a,b)=> (a.row-b.row) || a.x-b.x);
+  const picks = []; const step = Math.max(1, Math.floor(order.length/n));
+  for(let i=0;i<order.length && picks.length<n;i+=step) picks.push(order[(i+1)%order.length]);
+  picks.forEach((p,i)=>parkNow({mode: i%2 ? 'self':'valet'}, p));
+}
+function seedDemo(){
+  seedBase(8);
+  const bornes = S.places.filter(p=>p.ev);
+  if(bornes[0]) parkNow({mode:'valet', ev:true, soc:46, socShown:46, target:80, dep:Math.round(clockMin()+150)}, bornes[0], true);
+  const cls = S.places.filter(p=>p.state==='free' && !p.ev && p.row===1);
+  if(cls[0]) parkNow({mode:'valet', ev:true, soc:21, socShown:21, target:80, dep:Math.round(clockMin()+75)}, cls[0]);
+  at(2, ()=>addVehicle({mode:'self'}));
+}
+function startScenario(sc){
+  resetSim(false);
+  S.scen = sc; $('#bnTitle').textContent = `Scénario ${sc.k} · ${sc.t}`; $('#bnText').textContent = sc.d; step('');
+  document.querySelectorAll('.chip').forEach(c=>c.classList.toggle('on', c.dataset.k===sc.k));
+  log(`Scénario ${sc.k} lancé : ${sc.t}.`,'');
+  sc.run(); running = true; syncPlay();
+}
+
+/* ================================================================ BOUCLE DE SIMULATION */
+function tick(dt){
+  S.t += dt;
+  // chronologie des scénarios
+  S.timeline = S.timeline.filter(e=>{ if(S.t >= e.t){ e.fn(); return false; } return true; });
+  // scénario 5 : piéton déclenché quand le robot transporte le véhicule
+  if(S.watchObstacle){ const r = S.robots.find(r=>r.phase==='carrying' && Math.abs(r.z)<G.aw/2 && r.path.length<=2); if(r){ S.watchObstacle=false; simulateObstacle(); } }
+  // affectation forcée de la destination (scénario 5)
+  if(S.forceDest){ const t = S.tasks.find(t=>t.type==='depose' && t.state==='pending'); if(t){ t.forced = S.forceDest; S.forceDest = null; } }
+  planCharging();
+  dispatchWithForced();
+  allocatePower();
+  S.robots.forEach(r=>updateRobot(r,dt));
+  S.cars.forEach(c=>updateCar(c,dt));
+  S.cars.filter(c=>c.state==='gone').forEach(c=>{ if(c.onLeave) c.onLeave(); dyn.remove(c.mesh); if(selected && selected.ref===c) select(null); });
+  S.cars = S.cars.filter(c=>c.state!=='gone');
+  S.peds.forEach(p=>updatePed(p,dt));
+  S.peds.filter(p=>p.dead).forEach(p=>dyn.remove(p.mesh));
+  S.peds = S.peds.filter(p=>!p.dead);
+  S.tasks = S.tasks.filter(t=>t.state!=='done');
+  // historique pour les graphiques
+  S.histT += dt; if(S.histT >= 1){ S.histT = 0; const k = kpis(); S.hist.occ.push(k.occRate); S.hist.pow.push(S.power); if(S.hist.occ.length>120){ S.hist.occ.shift(); S.hist.pow.shift(); } }
+}
+function dispatchWithForced(){
+  // tâches avec destination imposée (scénario 5) : la place est choisie au fond pour un long trajet
+  const t = S.tasks.find(t=>t.forced && t.state==='pending');
+  if(t){ const free = S.robots.filter(r=>r.phase==='idle'||r.phase==='returning'); if(free.length && t.forced.state==='free'){ const r = free.sort((a,b)=>dist(a,t.car)-dist(b,t.car))[0]; const dest = t.forced; t.state='active'; t.robot=r; t.dest=dest; r.task=t; setPlace(dest,'reserved',t.car); dest.carHere=false; refreshPlace(dest); r.phase='toPickup'; r.path = route(r, pickupPos(t.car)); log(`${r.id} affecté : prise en charge de ${t.car.id} → ${dest.id}.`,''); step(`${r.id} se dirige vers le box de dépose`); } }
+  dispatch();
+}
+
+/* ================================================================ INDICATEURS */
+function kpis(){
+  const av = S.places.filter(p=>!p.unavailable);
+  const free = av.filter(p=>p.state==='free').length;
+  const occ = av.filter(p=>p.state==='occupied'||p.state==='charging').length;
+  const present = S.cars.filter(c=>!['gone','refused','exitBox','leaving'].includes(c.state));
+  const bornes = S.places.filter(p=>p.ev && !p.unavailable);
+  const r = S.restit;
+  return { total:S.places.length, free, occ, res:av.filter(p=>p.state==='reserved').length, unav:S.places.length-av.length,
+    occRate: av.length ? occ/av.length*100 : 0,
+    valet: present.filter(c=>c.mode==='valet').length, self: present.filter(c=>c.mode==='self').length,
+    charging: S.cars.filter(c=>c.state==='charging').length, bFree: bornes.filter(p=>p.state==='free').length, bTot: bornes.length,
+    active: S.robots.filter(r=>r.phase!=='idle').length, alerts:S.alerts, restit: r.length ? r.reduce((a,b)=>a+b,0)/r.length : null,
+    queue: waitingEVs().length };
+}
+function renderKpis(){
+  const k = kpis();
+  const tiles = [
+    ['Places totales', k.total, ''], ['Places libres', k.free, k.free===0?'alert':'ok'],
+    ['Places occupées', k.occ, ''], ['Taux d\'occupation', Math.round(k.occRate)+'<small> %</small>', k.occRate>90?'warn':''],
+    ['Véhicules voiturier', k.valet, ''], ['Stationnement libre', k.self, ''],
+    ['VE en recharge', k.charging + (k.queue? `<small> · ${k.queue} en attente</small>`:''), 'charge'], ['Bornes disponibles', `${k.bFree}<small> / ${k.bTot}</small>`, k.bFree? 'charge':'warn'],
+    ['Robots actifs', `${k.active}<small> / ${S.robots.length}</small>`, ''], ['Alertes sécurité', k.alerts, k.alerts? 'alert':'ok'],
+    ['Temps moyen de restitution', k.restit===null ? '—' : fmtDur(k.restit), k.restit===null?'':(k.restit<=H.restitObj?'ok':'warn')],
+    ['Puissance consommée', `${S.power.toFixed(1)}<small> / ${H.pAvail} kW</small>`, S.power>H.pAvail?'alert':'charge'],
+  ];
+  $('#kpis').innerHTML = tiles.map(([l,v,c])=>`<div class="kpi ${c}"><span>${l}</span><b>${v}</b></div>`).join('');
+  $('#cOccV').textContent = Math.round(k.occRate)+' %';
+  $('#cPowV').textContent = `${S.power.toFixed(1)} / ${H.pAvail} kW`;
+  drawChart($('#cOcc'), S.hist.occ, 100, cssVar('--accent'), null);
+  drawChart($('#cPow'), S.hist.pow, Math.max(H.pAvail*1.15, 1), cssVar('--charge'), H.pAvail);
+  // robots
+  const PH = ROBOT_PH; ({idle:['Au repos','idle'], returning:['Retour station','idle'], exiting:['Sortie de place','ok'], toPickup:['En route vers le véhicule','ok'], lifting:['Levage du véhicule','warn'], carrying:['Transport','warn'], lowering:['Dépose','warn']});
+  $('#robots').innerHTML = S.robots.map(r=>{ let [l,c] = PH[r.phase]||[r.phase,'idle']; if(r.brake.phase!=='none'){ l='Arrêt de sécurité'; c='alert'; }
+    const tk = r.task ? `${TASK_LABEL[r.task.type]} ${r.task.car.id}` : '—';
+    return `<div class="row"><span class="id">${r.id}</span><span class="st">${tk} · ${(r.v*3.6).toFixed(1)} km/h</span><span class="pill ${c}">${l}</span></div>`; }).join('');
+  // véhicules électriques
+  const evs = S.cars.filter(c=>c.ev && !['gone','exitBox','leaving'].includes(c.state)).sort((a,b)=>a.dep-b.dep);
+  $('#evs').innerHTML = evs.length ? evs.map(c=>{ const st = c.state==='charging' ? [`${c.place.borne} · ${(c.pw||0).toFixed(1)} kW`,'charge','En charge'] : c.charged ? ['chargé','ok','Terminé'] : c.wantCharge ? (c.task ? ['transfert en cours','warn','Transfert'] : ['attend une borne','warn','En attente']) : ['—','idle','Sans recharge'];
+      return `<div class="row"><span class="id">${c.id}</span><span class="st">${Math.round(c.socShown)} % → ${c.target} % · départ ${fmtHM(c.dep)} · ${st[0]}</span><span class="bar" title="Niveau affiché (mis à jour toutes les ${H.socStep/60} min)"><i style="width:${Math.round(c.socShown)}%"></i></span><span class="pill ${st[1]}">${st[2]}</span></div>`; }).join('')
+    : '<p class="empty">Aucun véhicule électrique dans le parking. Utilisez « Simuler une recharge » ou le scénario 4.</p>';
+  $('#clock').innerHTML = `${fmtT(S.t)}<small>heure simulée</small>`;
+  if(selected) renderInfo();
+}
+function drawChart(cv, data, max, color, limit){
+  const dpr = window.devicePixelRatio||1, w = cv.clientWidth, h = cv.clientHeight; if(!w) return;
+  if(cv.width !== Math.round(w*dpr)){ cv.width = Math.round(w*dpr); cv.height = Math.round(h*dpr); }
+  const c = cv.getContext('2d'); c.setTransform(dpr,0,0,dpr,0,0); c.clearRect(0,0,w,h);
+  c.strokeStyle = cssVar('--chart-grid'); c.lineWidth = 1;
+  for(let i=1;i<4;i++){ const y = Math.round(h*i/4)+.5; c.beginPath(); c.moveTo(0,y); c.lineTo(w,y); c.stroke(); }
+  if(limit!=null){ const y = h - limit/max*(h-6) - 3; c.strokeStyle = cssVar('--alert'); c.setLineDash([4,3]); c.beginPath(); c.moveTo(0,y); c.lineTo(w,y); c.stroke(); c.setLineDash([]); c.fillStyle = cssVar('--alert'); c.font = '10px "IBM Plex Mono", monospace'; c.fillText('limite '+limit+' kW', 4, y-3); }
+  if(data.length<2) return;
+  const n = 120, X = i => (i + (n - data.length))/(n-1)*w, Y = v => h - v/max*(h-6) - 3;
+  c.beginPath(); data.forEach((v,i)=> i? c.lineTo(X(i),Y(v)) : c.moveTo(X(i),Y(v)));
+  c.strokeStyle = color; c.lineWidth = 1.8; c.stroke();
+  c.lineTo(X(data.length-1),h); c.lineTo(X(0),h); c.closePath(); c.globalAlpha = .14; c.fillStyle = color; c.fill(); c.globalAlpha = 1;
+  c.beginPath(); c.arc(X(data.length-1), Y(data[data.length-1]), 3, 0, 7); c.fillStyle = color; c.fill();
+}
+
+/* ================================================================ SÉLECTION ET FICHE */
+const ROBOT_PH = {idle:['Au repos','idle'], returning:['Retour station','idle'], exiting:['Sortie de place','ok'], toPickup:['En route vers le véhicule','ok'], lifting:['Levage du véhicule','warn'], carrying:['Transport','warn'], lowering:['Dépose','warn']};
+const STATE_LABEL = {free:'Libre', occupied:'Occupée', charging:'En recharge', reserved:'Réservée / opération en cours'};
+const CAR_STATE = {arriving:'Arrivée', queueBox:'Attente devant le box', toBox:'Entrée dans le box', driverOut:'Descente du conducteur', checking:'Vérification de sécurité', waitPickup:'Attente du robot', carried:'Transporté par un robot', parked:'Stationné', charging:'En recharge', turning:'Orientation (plateau tournant)', ready:'Prêt au box de sortie', exitBox:'Quitte le parking', leaving:'Quitte le parking', selfParking:'Se gare (guidé)', refused:'Prise en charge refusée'};
+function select(s){ selected = s; const el = $('#info'); if(!s){ el.hidden = true; return; } el.hidden = false; renderInfo(); }
+function renderInfo(){
+  const s = selected, el = $('#info'); if(!s) return;
+  let h = '', acts = '';
+  if(s.kind==='place'){
+    const p = s.ref, st = p.unavailable ? 'Indisponible' : STATE_LABEL[p.state];
+    h = `<h3>Place ${p.id}<button class="x" data-a="close" aria-label="Fermer">×</button></h3><dl>
+      <dt>État</dt><dd>${st}</dd><dt>Véhicule</dt><dd>${p.car? p.car.id : '—'}</dd>
+      <dt>Type</dt><dd>${p.ev? 'Place VE' : 'Classique'}</dd><dt>Borne</dt><dd>${p.ev? `${p.borne} · Type 2 · ${H.pBorne} kW` : '—'}</dd>
+      <dt>Capteur</dt><dd>${p.carHere? 'présence détectée' : 'aucune présence'}</dd><dt>Rangée</dt><dd>${p.row===0?'Nord':'Sud'}</dd></dl>`;
+    if(p.state==='free') acts = `<button class="btn" data-a="toggle">${p.unavailable? 'Remettre en service':'Rendre indisponible'}</button>`;
+    if(p.car) acts += `<button class="btn" data-a="selcar">Voir ${p.car.id}</button>`;
+  } else if(s.kind==='car'){
+    const c = s.ref;
+    h = `<h3>Véhicule ${c.id}<button class="x" data-a="close" aria-label="Fermer">×</button></h3><dl>
+      <dt>Mode</dt><dd>${c.mode==='valet'?'Voiturier':'Stationnement libre'}</dd><dt>État</dt><dd>${CAR_STATE[c.state]||c.state}</dd>
+      <dt>Place</dt><dd>${c.place? c.place.id : (c.inBox? (c.inBox.id==='depose'?'Box dépose':'Box sortie') : '—')}</dd>
+      <dt>Motorisation</dt><dd>${c.ev?'Électrique':'Thermique'}</dd><dt>Masse</dt><dd>${c.mass} kg</dd><dt>Gabarit</dt><dd>${c.L.toFixed(1)} × ${c.W.toFixed(2)} m</dd>
+      ${c.ev? `<dt>Batterie</dt><dd>${Math.round(c.socShown)} % → ${c.target} %</dd><dt>Départ prévu</dt><dd>${fmtHM(c.dep)}</dd>`:''}
+      ${c.restitTime!=null? `<dt>Restitution</dt><dd>${fmtDur(c.restitTime)}</dd>`:''}</dl>`;
+    if(c.mode==='valet' && ['parked','charging'].includes(c.state) && !(c.task && c.task.type==='restitution')) acts += `<button class="btn primary" data-a="restit">Demander mon véhicule</button>`;
+    if(c.mode==='self' && c.state==='parked') acts += `<button class="btn" data-a="leave">Repartir</button>`;
+    if(['parked','charging'].includes(c.state) && !c.lock) acts += `<button class="btn" data-a="walk">Accès à pied</button>`;
+  } else if(s.kind==='robot'){
+    const r = s.ref;
+    h = `<h3>Robot ${r.id}<button class="x" data-a="close" aria-label="Fermer">×</button></h3><dl>
+      <dt>État</dt><dd>${r.brake.phase!=='none'?'Arrêt de sécurité':(ROBOT_PH[r.phase]||[r.phase])[0]}</dd><dt>Tâche</dt><dd>${r.task? TASK_LABEL[r.task.type]+' '+r.task.car.id : '—'}</dd>
+      <dt>Vitesse</dt><dd>${(r.v*3.6).toFixed(1)} km/h</dd><dt>Vitesse max chargé</dt><dd>${H.vLoaded} km/h</dd><dt>Détection</dt><dd>${H.detect} m</dd>
+      <dt>Distance parcourue</dt><dd>${(r.km||0).toFixed(0)} m</dd></dl>`;
+  } else if(s.kind==='box'){
+    const b = s.ref;
+    h = `<h3>${b.id==='depose'?'Box de dépose':'Box de sortie'}<button class="x" data-a="close" aria-label="Fermer">×</button></h3><dl><dt>État</dt><dd>${b.busy?'Occupé':'Libre'}</dd><dt>Véhicule</dt><dd>${b.car?b.car.id:'—'}</dd><dt>Équipement</dt><dd>${b.turn?'Plateau tournant':'Borne de validation, capteurs de vérification'}</dd></dl>`;
+  }
+  const html = h + (acts? `<div class="acts">${acts}</div>`:''); if(el._html !== html){ el._html = html; el.innerHTML = html; }
+}
+$('#info').addEventListener('click', e=>{
+  const a = e.target.closest('[data-a]'); if(!a) return; const s = selected; if(!s) return;
+  const act = a.dataset.a;
+  if(act==='close') select(null);
+  if(act==='toggle'){ s.ref.unavailable = !s.ref.unavailable; refreshPlace(s.ref); log(`${s.ref.id} ${s.ref.unavailable?'rendue indisponible':'remise en service'} par l'exploitant.`,''); renderInfo(); }
+  if(act==='selcar') select({kind:'car', ref:s.ref.car});
+  if(act==='restit') requestRestitution(s.ref);
+  if(act==='leave') selfLeave(s.ref);
+  if(act==='walk') walkToCar(s.ref);
+});
+
+/* ================================================================ RENDU 3D */
+function initThree(){
+  const cv = $('#view');
+  renderer = new THREE.WebGLRenderer({canvas:cv, antialias:true});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  camera = new THREE.PerspectiveCamera(42, 1, .5, 400);
+  controls = new THREE.OrbitControls(camera, cv);
+  controls.enableDamping = true; controls.maxPolarAngle = Math.PI/2.15; controls.minDistance = 8; controls.maxDistance = 140;
+  scene.add(new THREE.HemisphereLight(0xEAF2F5, 0x3A4046, .75));
+  const sun = new THREE.DirectionalLight(0xFFFFFF, .65); sun.position.set(20,40,25); sun.castShadow = true;
+  sun.shadow.mapSize.set(2048,2048); const sc = sun.shadow.camera; sc.left=-70; sc.right=70; sc.top=40; sc.bottom=-40; sc.far=120; scene.add(sun); scene.add(sun.target);
+  cv.addEventListener('pointerdown', e=>{ cv._down = {x:e.clientX, y:e.clientY}; });
+  cv.addEventListener('pointerup', e=>{ const d = cv._down; if(!d || Math.hypot(e.clientX-d.x, e.clientY-d.y) > 5) return; pick(e); });
+  window.addEventListener('resize', resize); resize();
+}
+function setBg(){ scene.background = new THREE.Color(cssVar('--scene-bg')||'#CDD5DA'); }
+function resize(){ const st = $('#stage'); const w = st.clientWidth, h = st.clientHeight; renderer.setSize(w,h,false); camera.aspect = w/Math.max(h,1); camera.updateProjectionMatrix(); }
+function viewPersp(){ followRobot=false; const cx = (G.spawnX+G.stationX)/2+6; camera.position.set(cx-4, 34, 40); controls.target.set(cx,0,0); controls.update(); }
+function viewTop(){ followRobot=false; const cx = (G.spawnX+G.stationX)/2+6; camera.position.set(cx, 70, .01); controls.target.set(cx,0,0); controls.update(); }
+function pick(e){
+  const rect = $('#view').getBoundingClientRect();
+  mouse.x = (e.clientX-rect.left)/rect.width*2-1; mouse.y = -(e.clientY-rect.top)/rect.height*2+1;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects([world, dyn], true).filter(h=>h.object.userData && h.object.userData.kind);
+  if(!hits.length) return;
+  const order = {car:0, robot:1, box:2, place:3};
+  hits.sort((a,b)=> (order[a.object.userData.kind]-order[b.object.userData.kind]) || a.distance-b.distance);
+  select({kind:hits[0].object.userData.kind, ref:hits[0].object.userData.ref});
+}
+
+let last = performance.now(), uiT = 0;
+function frame(now){
+  const realDt = Math.min(.05, (now-last)/1000); last = now;
+  if(running){ const total = realDt*speed, n = Math.ceil(total/.02); for(let i=0;i<n;i++) tick(total/n); }
+  uiT += realDt; if(uiT > .25){ uiT = 0; renderKpis(); }
+  // pulsation des bornes en charge
+  S.places.forEach(p=>{ if(p.bHead && p.state==='charging') p.bHead.material.emissiveIntensity = .7 + .4*Math.sin(now/300); });
+  if(followRobot && S.robots[0]){ const r = S.robots[0]; controls.target.lerp(new THREE.Vector3(r.x,0,r.z), .08); }
+  controls.update(); renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+
+/* ================================================================ INITIALISATION ET INTERFACE */
+function resetSim(demo){
+  select(null);
+  newState(); buildWorld();
+  S.robots.forEach(makeRobot); S.robots.forEach(syncMesh);
+  if(demo){ seedDemo(); S.scen=null; $('#bnTitle').textContent='État de démonstration'; $('#bnText').textContent='Parking en exploitation : stationnements libres, véhicules confiés au voiturier et recharge partagée en cours. Choisissez un scénario ou cliquez sur une place, un véhicule ou un robot.'; document.querySelectorAll('.chip').forEach(c=>c.classList.remove('on')); log('Jumeau numérique initialisé (données simulées).',''); }
+  renderLog(); renderKpis();
+}
+function syncPlay(){ $('#bPlay').textContent = running ? 'Mettre en pause' : 'Démarrer la simulation'; }
+function buildUI(){
+  $('#scenarios').innerHTML = SCEN.map(s=>`<button class="chip" type="button" data-k="${s.k}"><b>${s.k}</b><span>${s.t}<em>${s.d.split('.')[0]}.</em></span></button>`).join('');
+  $('#scenarios').addEventListener('click', e=>{ const b = e.target.closest('.chip'); if(b) startScenario(SCEN.find(s=>s.k===b.dataset.k)); });
+  $('#bPlay').addEventListener('click', ()=>{ running = !running; syncPlay(); });
+  $('#bReset').addEventListener('click', ()=>{ resetSim(true); running = true; syncPlay(); });
+  $('#speed').addEventListener('input', e=>{ speed = +e.target.value; $('#speedOut').textContent = '×'+speed; });
+  $('#bValet').addEventListener('click', ()=>requestValet());
+  $('#bRestit').addEventListener('click', ()=>requestRestitution(selected && selected.kind==='car' ? selected.ref : null));
+  $('#bCharge').addEventListener('click', ()=>simulateCharge());
+  $('#bObst').addEventListener('click', ()=>simulateObstacle());
+  $('#vPersp').addEventListener('click', viewPersp); $('#vTop').addEventListener('click', viewTop);
+  $('#vFollow').addEventListener('click', ()=>{ followRobot = !followRobot; });
+  $('#carForm').addEventListener('submit', e=>{
+    e.preventDefault();
+    const ev = $('#fEnergy').value==='ev';
+    const [hh,mm] = ($('#fDep').value||'11:00').split(':').map(Number);
+    const o = { mode:$('#fMode').value, ev, mass:+$('#fMass').value||1550, L:+$('#fLen').value||4.3, W:+$('#fWid').value||1.8,
+      soc:+$('#fSoc').value||25, target:+$('#fTarget').value||80, dep:hh*60+mm, passenger:$('#fPass').checked };
+    o.socShown = o.soc;
+    if(o.mode==='self' && ev) log('Véhicule électrique en stationnement libre : recharge non gérée par les robots (hypothèse : F2 concerne les véhicules confiés au voiturier).','warn');
+    if(o.mode==='self') o.ev && (o.wantCharge=false);
+    const car = addVehicle(o); if(o.mode==='self' && ev) car.wantCharge = false;
+  });
+  // paramètres
+  $('#hypTable').innerHTML = PARAMS.map(p=>`<tr><td><label for="h_${p[0]}">${p[1]}</label><span class="tag ${p[3]}">${p[3]==='dos'?'dossier':'hypothèse'}</span></td><td><input id="h_${p[0]}" type="number" min="${p[4]}" max="${p[5]}" step="${p[6]}" value="${H[p[0]]}"></td></tr>`).join('');
+  $('#bApply').addEventListener('click', ()=>{ PARAMS.forEach(p=>{ const v = parseFloat($('#h_'+p[0]).value); if(!isNaN(v)) H[p[0]] = Math.min(p[5], Math.max(p[4], v)); $('#h_'+p[0]).value = H[p[0]]; }); resetSim(true); viewPersp(); log('Paramètres appliqués.',''); });
+  const mq = window.matchMedia('(prefers-color-scheme: dark)'); mq.addEventListener && mq.addEventListener('change', ()=>{ setBg(); renderKpis(); });
+  new MutationObserver(()=>{ setBg(); renderKpis(); }).observe(document.documentElement, {attributes:true, attributeFilter:['data-theme']});
+}
+
+H.vPed = 1.3;
+initThree(); buildUI(); setBg(); resetSim(true); viewPersp(); syncPlay();
+requestAnimationFrame(t=>{ last = t; frame(t); });
+})();
+</script>
+
+</body>
+</html>
